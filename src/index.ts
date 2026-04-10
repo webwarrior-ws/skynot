@@ -209,7 +209,7 @@ async function createLauncherScript(): Promise<void> {
 
   // Write the launcher shell script
   const scriptContent = `#!/bin/bash
-exec sudo -u pi bash -c 'cd ${installDir} && npx pi-coding-agent "$@"' -- "$@"
+exec sudo -i -u pi bash -c 'cd ${installDir} && npx --yes @mariozechner/pi-coding-agent "$@"' -- "$@"
 `;
   fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
   console.log('Launcher script created.');
