@@ -113,6 +113,10 @@ async function launchAgent(): Promise<void> {
 }
 
 async function main() {
+  if (os.platform() === 'win32') {
+    throw new Error('Windows is not supported. Please run skynot on Linux or macOS.');
+  }
+
   const program = new Command();
   program.version('0.1.0').description('Setup pi user and install pi-coding-agent');
   program.parse(process.argv);
