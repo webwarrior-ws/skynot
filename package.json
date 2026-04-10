@@ -7,8 +7,9 @@
     "skynot": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
-    "prepublishOnly": "npm run build"
+    "build": "npx tsc",
+    "prepublishOnly": "npm run build",
+    "run": "npm install && npm run build && node dist/index.js"
   },
   "author": "",
   "license": "MIT",
