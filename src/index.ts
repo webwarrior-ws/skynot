@@ -176,6 +176,11 @@ async function ensurePiUser(): Promise<void> {
 
 async function installAgent(): Promise<void> {
   const installDir = getPiInstallDir();
+  const packageDir = path.join(installDir, 'node_modules', '@mariozechner', 'pi-coding-agent');
+  if (fs.existsSync(packageDir)) {
+    console.log('@mariozechner/pi-coding-agent is already installed, skipping.');
+    return;
+  }
   console.log(`Installing @mariozechner/pi-coding-agent into ${installDir}...`);
   const cmd = `mkdir -p ${installDir} && cd ${installDir} && npm install @mariozechner/pi-coding-agent`;
   await runAsPi(cmd);
