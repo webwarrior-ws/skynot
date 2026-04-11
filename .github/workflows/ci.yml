@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+  workflow_dispatch:
+
+  # to execute once a day (more info see https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule )
+  schedule:
+    - cron: "0 0 * * *"
+
+concurrency:
+  group: ci-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  build-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Update system dependencies
+        run: |
+          sudo apt-get update
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build
+        run: npm run build
