@@ -74,7 +74,7 @@ async function askQuestion(query: string, silent = false): Promise<string> {
 }
 
 const MAX_SUDO_RETRIES = 3;
-const PI_USER_PASSWORD = 'password';
+
 
 // Cached sudo password so we only ask once
 let cachedSudoPassword: string | null = null;
@@ -162,12 +162,12 @@ async function ensurePiUser(): Promise<void> {
   const platform = os.platform();
   if (platform === 'darwin') {
     await askSudoPasswordAndRun(
-      `sysadminctl -addUser pi -home /Users/pi -shell /bin/zsh && createhomedir -c -u pi 2>/dev/null; mkdir -p /Users/pi && chown pi:staff /Users/pi && dscl . -passwd /Users/pi '${PI_USER_PASSWORD}'`,
+      `sysadminctl -addUser pi -home /Users/pi -shell /bin/zsh && createhomedir -c -u pi 2>/dev/null; mkdir -p /Users/pi && chown pi:staff /Users/pi`,
       'required to create user',
     );
   } else {
     await askSudoPasswordAndRun(
-      `useradd -m -s /bin/bash pi && echo 'pi:${PI_USER_PASSWORD}' | chpasswd`,
+      `useradd -m -s /bin/bash pi`,
       'required to create user',
     );
   }
