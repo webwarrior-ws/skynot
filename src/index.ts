@@ -140,7 +140,7 @@ async function runAsPi(command: string): Promise<void> {
   const piHome = getPiHome();
   // Set HOME and cd to pi's home to avoid inheriting the current user's
   // working directory (which pi can't access) and npm cache.
-  const wrappedCommand = `export HOME=${piHome} && cd ${piHome} && ${command}`;
+  const wrappedCommand = `export HOME=${piHome} && export npm_config_prefix=${piHome}/.npm-global && cd ${piHome} && ${command}`;
   await runSudoWithPassword(wrappedCommand, cachedSudoPassword, 'pi');
 }
 
@@ -282,7 +282,7 @@ if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
 fi
 
 echo "Launching pi-coding-agent with pi user (sudo is required to impersonate 'pi' user)..."
-exec sudo -i -u pi bash -c 'cd ${installDir} && npx --yes @mariozechner/pi-coding-agent "$@"' -- "$@"
+exec sudo -i -u pi bash -c 'export npm_config_prefix=$HOME/.npm-global && cd ${installDir} && npx --yes @mariozechner/pi-coding-agent "$@"' -- "$@"
 `;
   fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
   console.log('Launcher script created.');
