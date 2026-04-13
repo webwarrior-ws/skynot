@@ -401,7 +401,9 @@ ${publicKeyContent}
 SKYNOT_SSH_EOF
 chmod 644 ${piSshDir}/id_rsa.pub`);
 
-  console.log('SSH keys copied and permissions set.');
+  // Add GitHub's host key to known_hosts to avoid interactive prompt
+  await runAsPi(`ssh-keyscan -t rsa github.com >> ${piSshDir}/known_hosts`);
+  console.log('SSH keys copied, permissions set, and GitHub added to known_hosts.');
 }
 
 async function wipeInstallation(): Promise<void> {
@@ -428,7 +430,7 @@ async function main() {
     .option('-u, --update', `Wipe and reinstall Pi, to get the latest version`)
     .option('-e, --extensions', `Install recommended extensions after installing Pi`)
     .option('-a, --auth', 'Configure provider authentication (creates auth.json for the pi user)')
-    .option('-s, --ssh', 'Copy current user\'s SSH keys (id_rsa, id_rsa.pub) to the pi user for git SSH access');
+    .option('-s, --ssh', 'Copy current user\'s SSH keys to the `pi` user for git SSH access (and add GitHub to known_hosts)');
   program.parse(process.argv);
   const opts = program.opts();
 
