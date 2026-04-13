@@ -12,6 +12,7 @@ import pkg from '../package.json';
 const execAsync = promisify(exec);
 
 const AGENT_PACKAGE = '@mariozechner/pi-coding-agent';
+const AGENT_USER = 'pi';
 
 function getShellRcFile(): string {
   const platform = os.platform();
@@ -24,9 +25,9 @@ function getShellRcFile(): string {
 function getPiHome(): string {
   const platform = os.platform();
   if (platform === 'darwin') {
-    return '/Users/pi';
+    return `/Users/${AGENT_USER}`;
   }
-  return '/home/pi';
+  return `/home/${AGENT_USER}`;
 }
 
 function getPiInstallDir(): string {
@@ -75,12 +76,6 @@ async function askQuestion(query: string, silent = false): Promise<string> {
   });
 }
 
-const MAX_SUDO_RETRIES = 3;
-
-
-// Cached sudo password so we only ask once
-let cachedSudoPassword: string | null = null;
-
 function runSudoWithPassword(command: string, password: string, asUser?: string, verbose?: boolean): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const sudoArgs = ['-S', '-k'];
@@ -124,7 +119,15 @@ function runSudoWithPassword(command: string, password: string, asUser?: string,
   });
 }
 
-async function askSudoPasswordAndRun(command: string, reason: string): Promise<void> {
+// Cached sudo password so we only ask once
+let cachedSudoPassword: string | null = null;
+
+async function askSudoPasswordAndRun(command: string, reason: string, asUser?: string, verbose?: boolean): Promise<void> {
+  const MAX_SUDO_RETRIES = 3;
+  if (cachedSudoPassword) {
+    await runSudoWithPassword(command, cachedSudoPassword, asUser, verbose);
+    return;
+  }
   for (let attempt = 1; attempt <= MAX_SUDO_RETRIES; attempt++) {
     const password = await askQuestion(`Enter sudo password (${reason}): `, true);
     try {
@@ -141,21 +144,17 @@ async function askSudoPasswordAndRun(command: string, reason: string): Promise<v
     cachedSudoPassword = password.trim();
 
     // Password is valid, now run the actual command
-    await runSudoWithPassword(command, password.trim());
+    await runSudoWithPassword(command, password.trim(), asUser, verbose);
     return;
   }
 }
 
 async function runAsPi(command: string, verbose?: boolean): Promise<void> {
-  if (!cachedSudoPassword) {
-    const password = await askQuestion('Enter sudo password (required to run as pi): ', true);
-    cachedSudoPassword = password.trim();
-  }
   const piHome = getPiHome();
-  // Set HOME and cd to pi's home to avoid inheriting the current user's
-  // working directory (which pi can't access) and npm cache.
+  // Set HOME and cd to the agent user's home to avoid inheriting the current user's
+  // working directory (which the agent user can't access) and npm cache.
   const wrappedCommand = `export HOME=${piHome} && export npm_config_prefix=${piHome}/.npm-global && cd ${piHome} && ${command}`;
-  await runSudoWithPassword(wrappedCommand, cachedSudoPassword, 'pi', verbose);
+  await askSudoPasswordAndRun(wrappedCommand, `required to run as '${AGENT_USER}' user`, AGENT_USER, verbose);
 }
 
 async function userExists(username: string): Promise<boolean> {
@@ -168,25 +167,26 @@ async function userExists(username: string): Promise<boolean> {
 }
 
 async function ensurePiUser(): Promise<void> {
-  const exists = await userExists('pi');
+  const exists = await userExists(AGENT_USER);
   if (exists) {
-    console.log('User "pi" already exists.');
+    console.log(`User "${AGENT_USER}" already exists.`);
     return;
   }
-  console.log('Creating user "pi"...');
+  console.log(`Creating user "${AGENT_USER}"...`);
+  const piHome = getPiHome();
   const platform = os.platform();
   if (platform === 'darwin') {
     await askSudoPasswordAndRun(
-      `sysadminctl -addUser pi -home /Users/pi -shell /bin/zsh && createhomedir -c -u pi 2>/dev/null; mkdir -p /Users/pi && chown pi:staff /Users/pi`,
+      `sysadminctl -addUser ${AGENT_USER} -home ${piHome} -shell /bin/zsh && createhomedir -c -u ${AGENT_USER} 2>/dev/null; mkdir -p ${piHome} && chown ${AGENT_USER}:staff ${piHome}`,
       'required to create user',
     );
   } else {
     await askSudoPasswordAndRun(
-      `useradd -m -s /bin/bash pi`,
+      `useradd -m -s /bin/bash ${AGENT_USER}`,
       'required to create user',
     );
   }
-  console.log('User "pi" created.');
+  console.log(`User "${AGENT_USER}" created.`);
 }
 
 async function installAgent(verbose?: boolean): Promise<void> {
@@ -214,12 +214,12 @@ async function updatePath(): Promise<void> {
   if (fs.existsSync(rcPath)) {
     const content = fs.readFileSync(rcPath, 'utf-8');
     if (content.includes(line)) {
-      console.log(`pi's PATH already configured in ${rcFile}, skipping.`);
+      console.log(`${AGENT_USER}'s PATH already configured in ${rcFile}, skipping.`);
       return;
     }
   }
 
-  console.log(`Adding agent binary directory to pi's PATH via ${rcFile}...`);
+  console.log(`Adding agent binary directory to ${AGENT_USER}'s PATH via ${rcFile}...`);
   const checkCmd = `grep -Fx '${line}' ${rcPath} 2>/dev/null || echo '${line}' >> ${rcPath}`;
   await runAsPi(checkCmd);
   console.log(`${rcFile} updated.`);
@@ -254,7 +254,7 @@ HOME_BASE="${homeBase}"
 PI_HOME="${piHome}"
 
 for user_home in "$HOME_BASE"/*/; do
-  # Skip pi's own home
+  # Skip ${AGENT_USER}'s own home
   if [ "$user_home" = "$PI_HOME/" ]; then
     continue
   fi
@@ -281,7 +281,7 @@ for user_home in "$HOME_BASE"/*/; do
 done
 
 if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
-  echo "WARNING: The following user home directories are accessible by other users (including pi):"
+  echo "WARNING: The following user home directories are accessible by other users (including '${AGENT_USER}' user):"
   for dir in "\${EXPOSED_DIRS[@]}"; do
     echo "  $dir"
   done
@@ -298,8 +298,8 @@ if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
   echo ""
 fi
 
-echo "Launching pi-coding-agent with pi user (sudo is required to impersonate 'pi' user)..."
-exec sudo -i -u pi bash -c 'export npm_config_prefix=$HOME/.npm-global && mkdir -p ${workDir} && cd ${workDir} && ${installDir}/node_modules/.bin/pi "$@"' -- "$@"
+echo "Launching pi-coding-agent with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
+exec sudo -i -u ${AGENT_USER} bash -c 'export npm_config_prefix=$HOME/.npm-global && mkdir -p ${workDir} && cd ${workDir} && ${installDir}/node_modules/.bin/pi "$@"' -- "$@"
 `;
   fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
   console.log('Launcher script created.');
@@ -443,8 +443,8 @@ async function main() {
     .option('-v, --verbose', 'Show detailed output from install commands (useful for slow connections or debugging)')
     .option('-u, --update', `Wipe and reinstall Pi, to get the latest version`)
     .option('-e, --extensions', `Install recommended extensions after installing Pi`)
-    .option('-a, --auth', 'Configure provider authentication (creates auth.json for the pi user)')
-    .option('-s, --ssh', 'Copy current user\'s SSH keys to the `pi` user for git SSH access (and add GitHub to known_hosts)');
+    .option('-a, --auth', `Configure provider authentication (creates auth.json for the '${AGENT_USER}' user)`)
+    .option('-s, --ssh', `Copy current user's SSH keys to the '${AGENT_USER}' user for git SSH access (and add GitHub to known_hosts)`);
   program.parse(process.argv);
   const opts = program.opts();
 
