@@ -1,5 +1,5 @@
-SkyNot
-=======
+SkyNot [![NPM Version](https://img.shields.io/npm/v/skynot)](https://www.npmjs.com/package/skynot)
+======
 
 Ever tempted to use or try out the infamous `pi-coding-agent` but got put off by its lack of out-of-the-box sandbox?
 
@@ -7,13 +7,14 @@ Some people use and/or develop guardrails extensions or poor-man sandboxing solu
 
 But the virtue is somewhere in the middle:
 - No need to go to the extreme of complicated cloud deploys to just try out some clanking business.
-- No need to setup complicated tweaks or plugins that may give you a false sense of security, or too many permissions issues for your clanker to be productive.
+- No need to setup potentially-unsafe tweaks or plugins that may give you a false sense of security, or too many permissions issues for your clanker to be productive.
 
-Why not just use the unix model? Give pi a user profile in your system, a $HOME where to place its git repositories and you're off to the races.
+Why not just use the **unix** model? Give Pi a user in your system, a $HOME where to place its git repositories and you're off to the races.
 
-This repository is just a quick NPX tool that helps you set up this ideal approach: run it with a simple `npx skynot` and it will guide you through the process and ask you for sudo permissions in each step that it requires, informing you of what it is doing at all times.
+This repository is just a quick `npx` tool that helps you set up this ideal approach: run it with a simple `npx skynot` and it will guide you through the process and ask you for sudo permissions in each step that it requires, informing you of what it is doing at all times.
 
 (This repo is of course opensource too so that you can check that what it says it does is what it really does.)
+
 
 ## Usage
 
@@ -23,28 +24,30 @@ npx skynot [options]
 
 The following command‑line flags are available:
 
-| Flag | Long Flag      | Description                                                                      |
-|------|----------------|----------------------------------------------------------------------------------|
-| `-h` | `--help`       | Show the help message with all available options.                                |
-| `-u` | `--update`     | Wipe any existing installation of Pi and reinstall, to get the latest version.   |
-| `-e` | `--extensions` | After installing Pi, also install recommended extensions.                        |
-| `-a` | `--auth`       | Ask about auth details (provider name and API key) to add it to launcher script. |
-| `-s` | `--ssh`        | Copy SSH keys to the `pi` user for git+ssh (& add GitHub to `known_hosts`).      |
-| `-v` | `--verbose`    | Show more output from install commands (useful for debugging/low-bandwidth).     |
-| `-V` | `--version`    | Show the version number.                                                         |
+| Flag         | Alias | Description                                                                       |
+|--------------|-------|-----------------------------------------------------------------------------------|
+|`--help`      | `-h`  | Show the help message with all available options.                                 |
+|`--auth`      | `-a`  | Ask about auth details (provider name and API key) to add it to launcher script.  |
+|`--extensions`| `-e`  | After installing Pi, also install recommended extensions.                         |
+|`--ssh`       | `-s`  | Copy SSH keys to the `pi` user for git+ssh (& add GitHub to `known_hosts`).       |
+|`--update`    | `-u`  | Wipe any previous existing install of Pi and reinstall, to get the latest version.|
+|`--verbose`   | `-v`  | Show more output from install commands (useful for debugging/low-bandwidth).      |
+|`--version`   | `-V`  | Output the version number.                                                        |
 
 Please note, `-u` would technically not wipe or reinstall extensions, as they normally live in a different place (`.pi` subdir under `pi` user's $HOME, and/or $NPM_CONFIG_PREFIX dir).
 
+
 ## Installation Steps (performed automatically)
 
-1. Ensure a `pi` user exists (created if missing).
-2. Install `@mariozechner/pi-coding-agent` under `~pi/pi/`.
-3. Optionally install the recommended extensions.
+1. Create a user `pi`, if missing.
+2. Download & install Pi under `~pi/pi/`.
+3. Install the recommended extensions and/or authentication files if user used flags for them.
 4. Add the agent's binary directory to the `pi` user's `$PATH`.
 5. Create a launcher script at `$HOME/bin/pi` for the current user.
 6. Launch the agent.
 
+
 ## Notes
 
-- The script runs many operations as the `pi` user via `sudo`. It sets `npm_config_prefix` to `$HOME/.npm-global` to avoid permission errors when installing extensions.
+- The script runs many operations as the `pi` user via `sudo`. It sets `npm_config_prefix` to `$HOME/.npm-global` to avoid permission errors when installing extensions from NPM.
 - To test locally (directly from sources instead of using `npx`), use `npm run exec -- [options]` (e.g. `npm run exec -- -e`).
