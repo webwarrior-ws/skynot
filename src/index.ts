@@ -503,23 +503,16 @@ async function copySshKeys(): Promise<void> {
 
   console.log(`Copying SSH keys to ${piSshDir}...`);
 
-  const privateKeyContent = fs.readFileSync(privateKey, 'utf-8');
-  const publicKeyContent = fs.readFileSync(publicKey, 'utf-8');
 
-  // Create .ssh dir, write keys, set proper ownership and permissions
+
+  const reason = 'required to copy SSH keys';
+
+  // Create .ssh dir with proper ownership and permissions
   await runAsPi(`mkdir -p ${piSshDir} && chmod 700 ${piSshDir}`);
 
-  // Write private key
-  await runAsPi(`cat > ${piSshDir}/id_rsa << 'SKYNOT_SSH_EOF'
-${privateKeyContent}
-SKYNOT_SSH_EOF
-chmod 600 ${piSshDir}/id_rsa`);
-
-  // Write public key
-  await runAsPi(`cat > ${piSshDir}/id_rsa.pub << 'SKYNOT_SSH_EOF'
-${publicKeyContent}
-SKYNOT_SSH_EOF
-chmod 644 ${piSshDir}/id_rsa.pub`);
+  // Copy keys as root (pi user can't read the source), then chown to pi
+  await askSudoPasswordAndRun(`cp ${privateKey} ${piSshDir}/id_rsa && chown ${AGENT_USER} ${piSshDir}/id_rsa && chmod 600 ${piSshDir}/id_rsa`, reason);
+  await askSudoPasswordAndRun(`cp ${publicKey} ${piSshDir}/id_rsa.pub && chown ${AGENT_USER} ${piSshDir}/id_rsa.pub && chmod 644 ${piSshDir}/id_rsa.pub`, reason);
 
   // Add GitHub's host key to known_hosts to avoid interactive prompt
   await runAsPi(`ssh-keyscan -t rsa github.com >> ${piSshDir}/known_hosts`);
