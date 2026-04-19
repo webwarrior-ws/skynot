@@ -138,7 +138,7 @@ async function askSudoPasswordAndRun(command: string, reason: string, asUser?: s
     const password = await askQuestion(`Enter sudo password (${reason}): `, true);
     try {
       // Validate the password with a trivial command first
-      await runSudoWithPassword('ls /', password.trim());
+      await runSudoWithPassword('ls /', password);
     } catch (e) {
       if (attempt < MAX_SUDO_RETRIES) {
         console.error('Incorrect password, please try again.');
@@ -147,10 +147,10 @@ async function askSudoPasswordAndRun(command: string, reason: string, asUser?: s
         throw new Error(`Failed after ${MAX_SUDO_RETRIES} attempts. Aborting.`);
       }
     }
-    cachedSudoPassword = new Some(password.trim());
+    cachedSudoPassword = new Some(password);
 
     // Password is valid, now run the actual command
-    await runSudoWithPassword(command, password.trim(), asUser, verbose);
+    await runSudoWithPassword(command, password, asUser, verbose);
     return;
   }
 }
