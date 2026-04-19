@@ -16,6 +16,18 @@ This repository is just a quick `npx` tool that helps you set up this ideal appr
 (This repo is of course opensource too so that you can check that what it says it does is what it really does.)
 
 
+## Installation Steps (performed automatically under-the-hood)
+
+1. Create a user named `pi`, if missing.
+2. Create a group named `aiteam`, if missing.
+3. Download & install Pi under `pi` user's home: `~pi/pi/`.
+4. Install the recommended extensions and/or authentication files if user used flags for them.
+5. Add the agent's binary directory to the `pi` user's `$PATH` env var.
+6. Create a launcher script at `$HOME/bin/pi` for the current user.
+7. Create a proper work dir inside `~pi` named `Work`, owned by `pi:aiteam`.
+8. Assign both `pi` user and current user to group `aiteam`.
+
+
 ## Usage
 
 ```bash
@@ -35,17 +47,8 @@ The following command‑line flags are available:
 |`--version`   | `-V`   | Output the version number.                                                        |
 |`--destroy`   |`--BURN`| Delete the `pi` user, all its data (in `$HOME`), and the `aiteam` group.          |
 
+
 Please note, `-u` would technically not wipe or reinstall extensions, as they normally live in a different place (`.pi` subdir under `pi` user's $HOME, and/or $NPM_CONFIG_PREFIX dir).
-
-
-## Installation Steps (performed automatically)
-
-1. Create a user `pi`, if missing.
-2. Download & install Pi under `~pi/pi/`.
-3. Install the recommended extensions and/or authentication files if user used flags for them.
-4. Add the agent's binary directory to the `pi` user's `$PATH`.
-5. Create a launcher script at `$HOME/bin/pi` for the current user.
-6. Create a proper work dir inside `~pi` owned by `pi` and a new `aiteam` group, which `pi` and current user will be members of.
 
 
 ## Notes
