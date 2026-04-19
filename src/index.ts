@@ -137,7 +137,7 @@ async function askSudoPasswordAndRun(command: string, reason: string, asUser?: s
     return;
   }
   for (let attempt = 1; attempt <= MAX_SUDO_RETRIES; attempt++) {
-    const password = await askQuestion(`Enter sudo password (${reason}): `, true);
+    const password = await askQuestion(`Enter sudo password (${reason}) [exact command: \`${command}\`]: `, true);
     try {
       // Validate the password with a trivial command first
       await runSudoWithPassword('ls /', password);
