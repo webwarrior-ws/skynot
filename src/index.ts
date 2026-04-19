@@ -5,6 +5,7 @@ import * as readline from 'readline';
 import { promisify } from 'util';
 import * as os from 'os';
 import { Command } from 'commander';
+import { Option, Some, Nothing } from 'fp-sdk';
 import pkg from '../package.json';
 
 const execAsync = promisify(exec);
@@ -13,6 +14,7 @@ const AGENT_PACKAGE = '@mariozechner/pi-coding-agent';
 const AGENT_USER = 'pi';
 const LAUNCHER_SCRIPT_FILENAME = 'pi';
 const AGENT_GROUP_NAME = "aiteam";
+
 
 function getShellRcFile(): string {
   const platform = os.platform();
@@ -123,9 +125,6 @@ function runSudoWithPassword(command: string, password: string, asUser?: string,
 }
 
 // Cached sudo password so we only ask once
-import { Option, Some, Nothing } from 'fp-sdk';
-
-// Cached sudo password using Option type; None means not cached yet
 let cachedSudoPassword: Option<string> = Nothing;
 
 // When true, never cache the sudo password — ask every time
