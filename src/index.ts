@@ -629,9 +629,9 @@ async function main() {
   }
 
   if (opts.destroy) {
-    if (opts.paranoid || opts.update || opts.extensions || opts.auth || opts.ssh) {
-      console.error('Error: --destroy is not compatible with other flags (only --verbose)');
-      console.error('Please run --destroy alone (or with --verbose) and try again.');
+    if (opts.update || opts.extensions || opts.auth || opts.ssh) {
+      console.error('Error: --destroy is only compatible with --verbose and/or --paranoid flags)');
+      console.error('Please try again with a different flags combination.');
       process.exit(1);
     }
     await destroyInstallation();
