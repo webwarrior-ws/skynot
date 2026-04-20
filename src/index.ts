@@ -1,13 +1,12 @@
-import { exec, spawn } from 'child_process';
+import { ChildProcess, ChildProcessWithoutNullStreams, exec, spawn, SpawnOptionsWithoutStdio } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
 import { promisify } from 'util';
 import * as os from 'os';
 import { Command } from 'commander';
-import { Option, Some, Nothing } from 'fp-sdk';
+import { Option, Some, Nothing, None, OptionHelpers } from 'fp-sdk';
 import pkg from '../package.json';
-import { None, OptionHelpers } from "fp-sdk";
 
 const execAsync = promisify(exec);
 
@@ -17,6 +16,57 @@ const AGENT_USER = 'pi';
 const LAUNCHER_SCRIPT_FILENAME = 'pi';
 const AGENT_GROUP_NAME = "aiteam";
 
+type RunProcessOptions = {
+  cwd?: string;
+  onSpawn?: ((child: ChildProcessWithoutNullStreams) => void);
+  onError?: ((child: ChildProcessWithoutNullStreams, code: number | null) => Error);
+  verboseStdOut?: boolean;
+  verboseStdErr?: boolean;
+}
+
+function runCommand(command: string, args: string[], options: RunProcessOptions) : Promise<void> {
+  return new Promise((resolve, reject) => {
+    const spawnOptions : SpawnOptionsWithoutStdio = { stdio: ['pipe', 'pipe', 'pipe'] };
+    const cwd = OptionHelpers.OfObj(options.cwd);
+    if (cwd instanceof Some) {
+      spawnOptions.cwd = cwd.value;
+    }
+    const child = spawn(command, args, spawnOptions);
+    
+    const redirectStdOut = OptionHelpers.OfObj(options.verboseStdOut);
+    if (redirectStdOut instanceof Some && redirectStdOut.value) {
+      child.stdout.pipe(process.stdout);
+    }
+    const redirectStdErr = OptionHelpers.OfObj(options.verboseStdErr);
+    if (redirectStdErr instanceof Some && redirectStdErr.value) {
+      child.stderr.pipe(process.stderr);
+    }
+
+    const onSpawn = OptionHelpers.OfObj(options.onSpawn);
+    if (onSpawn instanceof Some) {
+      onSpawn.value(child);
+    }
+
+    child.on("error", (error: Error) => {
+      reject(error);
+    });
+
+    child.on("close", (code: number | null) => {
+      if (code === 0) {
+        resolve();
+      }
+      else {
+        const onError = OptionHelpers.OfObj(options.onError);
+        if (onError instanceof None) {
+          reject(new Error(`command '${command}' failed (exit code ${code})`));
+        }
+        else {
+          reject(onError.value(child, code));
+        }
+      }
+    });
+  });
+}
 
 function getShellRcFile(): string {
   const platform = os.platform();
@@ -80,25 +130,18 @@ async function askQuestion(query: string, silent = false): Promise<string> {
   });
 }
 
-function runSudoWithPassword(command: string, password: string, asUser?: string, verbose?: boolean): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const sudoArgs = ['-S', '-k'];
-    if (asUser) {
-      sudoArgs.push('-u', asUser);
-    }
-    sudoArgs.push('bash', '-c', command);
-    const child = spawn('sudo', sudoArgs, {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      // this is a workaround to errors like 'shell-init: error retrieving current directory: getcwd: cannot access parent directories: Permission denied
-      cwd: '/tmp',
-    });
+async function runSudoWithPassword(command: string, password: string, asUser?: string, verbose?: boolean): Promise<void> {
+  const sudoArgs = ['-S', '-k'];
+  if (asUser) {
+    sudoArgs.push('-u', asUser);
+  }
+  sudoArgs.push('bash', '-c', command);
+
+  let stderr = '';
+
+  const onSpawn = (child: ChildProcessWithoutNullStreams) => {
     child.stdin.write(password + '\n');
     child.stdin.end();
-
-    let stderr = '';
-    if (verbose) {
-      child.stdout.pipe(process.stdout);
-    }
     child.stderr.on('data', (data: Buffer) => {
       const line = data.toString();
       // Filter out sudo's own password prompt
@@ -109,21 +152,24 @@ function runSudoWithPassword(command: string, password: string, asUser?: string,
         }
       }
     });
+  }
 
-    child.on('close', (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        // Sanitize: never include the password in error messages
-        let safeStderr = stderr;
-        if (password !== "") {
-          const escaped = password.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          safeStderr = stderr.replace(new RegExp(escaped, 'g'), '***');
-        }
-        reject(new Error(`sudo command '${command}' failed (exit code ${code}): ${safeStderr.trim()}`));
-      }
-    });
-  });
+  const onError = (child: ChildProcessWithoutNullStreams, code: number | null) => {
+    // Sanitize: never include the password in error messages
+    const escaped = password.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const safeStderr = stderr.replace(new RegExp(escaped, 'g'), '***');
+    return new Error(`sudo command '${command}' failed (exit code ${code}): ${safeStderr.trim()}`);
+  }
+
+  const options : RunProcessOptions = {
+    // this is a workaround to errors like 'shell-init: error retrieving current directory: getcwd: cannot access parent directories: Permission denied
+    cwd: '/tmp',
+    onSpawn: onSpawn,
+    onError: onError,
+    verboseStdOut: verbose
+  }
+
+  await runCommand('sudo', sudoArgs, options);
 }
 
 // Cached sudo password so we only ask once
@@ -215,28 +261,6 @@ async function ensurePiUser(): Promise<void> {
   console.log(`User "${AGENT_USER}" created.`);
 }
 
-function runCommand(command: string, args: string[], verbose?: boolean) : Promise<void> {
-  return new Promise((resolve, reject) => {
-    const stdio = verbose ? "inherit" : "ignore";
-    const child = spawn(command, args, { 
-      stdio: [ stdio, stdio, stdio ]
-    });
-
-    child.on("error", (error: Error) => {
-      reject(error);
-    });
-
-    child.on("close", (code: number | null) => {
-      if (code === 0) {
-        resolve();
-      }
-      else {
-        reject(new Error(`command '${command}' failed (exit code ${code})`));
-      }
-    });
-  });
-}
-
 async function installAgentUsingNpm(verbose?: boolean): Promise<void> {
   const installDir = getPiInstallDir();
   const [scope, name] = AGENT_PACKAGE.split('/');
@@ -291,7 +315,13 @@ async function installAgentFromTarball(verbose?: boolean): Promise<void> {
   const assetUrl = asset.value["browser_download_url"];
 
   const tarballPath = path.join("/var/tmp", tarballName);
-  await runCommand('wget', [ assetUrl, `--output-document=${tarballPath}` ], verbose);
+  // wget shows progeress in stderr
+  const wgetProcessOptions = { verboseStdOut: verbose, verboseStdErr: verbose };
+  const wgetCommandArgs = [ assetUrl, `--output-document=${tarballPath}`];
+  if (!verbose) {
+    wgetCommandArgs.push('--quiet');
+  }
+  await runCommand('wget', wgetCommandArgs, wgetProcessOptions);
 
   const tarVerboseFlag = verbose ? "--verbose" : "";
   const cmd = `cd ${piHome} && tar --extract --gzip ${tarVerboseFlag} --file ${tarballPath}`;
