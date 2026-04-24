@@ -12,8 +12,8 @@ const execAsync = promisify(exec);
 
 const AGENT_PACKAGE = '@mariozechner/pi-coding-agent';
 const AGENT_GITHUB_REPO = "badlogic/pi-mono";
-const LAUNCHER_SCRIPT_FILENAME = 'pi';
 const AGENT_USER = 'aidev';
+const LAUNCHER_SCRIPT_FILENAME = 'spi';
 const AGENT_GROUP_NAME = "aiteam";
 
 type RunProcessOptions = {

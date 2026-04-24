@@ -24,12 +24,12 @@ This repository is just a quick `npx` tool that helps you set up this ideal appr
 4. Download & install Pi under `aidev` user's home: `~aidev/pi/`.
 5. Install the recommended extensions and/or authentication files if user used flags for them.
 6. Add the agent's binary directory to the `aidev` user's `$PATH` env var.
-7. Create a launcher script at `$HOME/bin/pi` for the current user.
+7. Create a launcher script at `$HOME/bin/spi` for the current user.
 8. Create a proper work dir inside `~aidev` named `Work`, owned by `aidev:aiteam`.
 9. Assign both `aidev` user and current user to group `aiteam`.
 
 
-## Launch Steps (performed every time you run the launcher script `pi`)
+## Launch Steps (performed every time you run the launcher script `spi`)
 
 1. Check that all directories of users are not readable or writable by `aidev` user.
 2. If any of the user directories are readable or writable, prompt to shield them.
