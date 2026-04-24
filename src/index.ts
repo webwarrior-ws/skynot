@@ -332,8 +332,8 @@ async function installAgentFromTarball(verbose?: boolean): Promise<void> {
 async function updatePath(): Promise<void> {
   const rcFile = getShellRcFile();
   const piHome = getPiHome();
-  const line = "export PATH=\$HOME/pi/node_modules/.bin:\$PATH";
   const rcPath = `${piHome}/${rcFile}`;
+  const line = `export PATH=\$HOME/${AGENT_USER}/node_modules/.bin:\$PATH`;
 
   // Check locally if the line is already present
   if (fs.existsSync(rcPath)) {
@@ -371,7 +371,7 @@ async function createLauncherScript(piBinaryPath: string): Promise<void> {
 
 CURRENT_DIR=$PWD
 
-echo "About to launch pi-coding-agent..."
+echo "About to launch Pi..."
 
 # Check permissions of other users' home directories
 EXPOSED_DIRS=()
@@ -423,8 +423,8 @@ if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
   echo ""
 fi
 
-echo "Launching pi-coding-agent with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
 exec sudo -i -u ${AGENT_USER} bash -c "export npm_config_prefix=$PI_HOME/.npm-global && cd $CURRENT_DIR && ${piBinaryPath}"
+echo "Launching Pi with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
 `;
   fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
   console.log('Launcher script created.');
@@ -541,14 +541,14 @@ async function installExtensions(piBinaryPath: string, verbose?: boolean): Promi
 }
 
 async function launchAgent(): Promise<void> {
-  const scriptPath = path.join(os.homedir(), 'bin', 'pi');
+  const scriptPath = path.join(os.homedir(), 'bin', LAUNCHER_SCRIPT_FILENAME);
   const child = spawn(scriptPath, [], { stdio: 'inherit' });
   return new Promise<void>((resolve, reject) => {
     child.on('close', (code) => {
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`pi-coding-agent exited with code ${code}`));
+        reject(new Error(`Pi exited with code ${code}`));
       }
     });
   });
