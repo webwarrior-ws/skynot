@@ -12,8 +12,8 @@ const execAsync = promisify(exec);
 
 const AGENT_PACKAGE = '@mariozechner/pi-coding-agent';
 const AGENT_GITHUB_REPO = "badlogic/pi-mono";
-const AGENT_USER = 'pi';
 const LAUNCHER_SCRIPT_FILENAME = 'pi';
+const AGENT_USER = 'aidev';
 const AGENT_GROUP_NAME = "aiteam";
 
 type RunProcessOptions = {
@@ -76,7 +76,7 @@ function getShellRcFile(): string {
   return '.bashrc';
 }
 
-function getPiHome(): string {
+function getAgentUserHome(): string {
   const platform = os.platform();
   if (platform === 'darwin') {
     return `/Users/${AGENT_USER}`;
@@ -85,7 +85,7 @@ function getPiHome(): string {
 }
 
 function getPiInstallDir(): string {
-  return `${getPiHome()}/pi`;
+  return `${getAgentUserHome()}/pi`;
 }
 
 async function askQuestion(query: string, silent = false): Promise<string> {
@@ -207,11 +207,11 @@ async function askSudoPasswordAndRun(command: string, reason: string, asUser?: s
   }
 }
 
-async function runAsPi(command: string, verbose?: boolean): Promise<void> {
-  const piHome = getPiHome();
+async function runAsAgentUser(command: string, verbose?: boolean): Promise<void> {
+  const agentUserHome = getAgentUserHome();
   // Set HOME and cd to the agent user's home to avoid inheriting the current user's
   // working directory (which the agent user can't access) and npm cache.
-  const wrappedCommand = `export HOME=${piHome} && export npm_config_prefix=${piHome}/.npm-global && cd ${piHome} && ${command}`;
+  const wrappedCommand = `export HOME=${agentUserHome} && export npm_config_prefix=${agentUserHome}/.npm-global && cd ${agentUserHome} && ${command}`;
   await askSudoPasswordAndRun(wrappedCommand, `required to run as '${AGENT_USER}' user`, AGENT_USER, verbose);
 }
 
@@ -238,18 +238,18 @@ async function groupExists(groupName: string): Promise<boolean> {
   }
 }
 
-async function ensurePiUser(): Promise<void> {
+async function ensureAgentUserExists(): Promise<void> {
   const exists = await userExists(AGENT_USER);
   if (exists) {
     console.log(`User "${AGENT_USER}" already exists.`);
     return;
   }
   console.log(`Creating user "${AGENT_USER}"...`);
-  const piHome = getPiHome();
+  const agentUserHome = getAgentUserHome();
   const platform = os.platform();
   if (platform === 'darwin') {
     await askSudoPasswordAndRun(
-      `sysadminctl -addUser ${AGENT_USER} -home ${piHome} -shell /bin/zsh && createhomedir -c -u ${AGENT_USER} 2>/dev/null; mkdir -p ${piHome} && chown ${AGENT_USER}:staff ${piHome}`,
+      `sysadminctl -addUser ${AGENT_USER} -home ${agentUserHome} -shell /bin/zsh && createhomedir -c -u ${AGENT_USER} 2>/dev/null; mkdir -p ${agentUserHome} && chown ${AGENT_USER}:staff ${agentUserHome}`,
       'required to create user',
     );
   } else {
@@ -272,7 +272,7 @@ async function installAgentUsingNpm(verbose?: boolean): Promise<void> {
   console.log(`Installing ${AGENT_PACKAGE} into ${installDir}...`);
   const npmLogLevel = verbose ? ' --loglevel info' : '';
   const cmd = `mkdir -p ${installDir} && cd ${installDir} && npm install${npmLogLevel} ${AGENT_PACKAGE}`;
-  await runAsPi(cmd, verbose);
+  await runAsAgentUser(cmd, verbose);
   console.log('Package installed.');
 }
 
@@ -287,7 +287,7 @@ async function checkWget(): Promise<void> {
 }
 
 async function installAgentFromTarball(verbose?: boolean): Promise<void> {
-  const piHome = getPiHome();
+  const agentUserHome = getAgentUserHome();
   const piInstallDir = getPiInstallDir();
   const platform = os.platform();
   const arch = os.arch();
@@ -324,16 +324,16 @@ async function installAgentFromTarball(verbose?: boolean): Promise<void> {
   await runCommand('wget', wgetCommandArgs, wgetProcessOptions);
 
   const tarVerboseFlag = verbose ? "--verbose" : "";
-  const cmd = `cd ${piHome} && tar --extract --gzip ${tarVerboseFlag} --file ${tarballPath}`;
-  await runAsPi(cmd, verbose);
-  console.log(`Installed pi from tarball.`);
+  const cmd = `cd ${agentUserHome} && tar --extract --gzip ${tarVerboseFlag} --file ${tarballPath}`;
+  await runAsAgentUser(cmd, verbose);
+  console.log(`Installed Pi from tarball.`);
 }
 
 async function updatePath(): Promise<void> {
   const rcFile = getShellRcFile();
-  const piHome = getPiHome();
-  const rcPath = `${piHome}/${rcFile}`;
+  const agentUserHome = getAgentUserHome();
   const line = `export PATH=\$HOME/${AGENT_USER}/node_modules/.bin:\$PATH`;
+  const rcPath = `${agentUserHome}/${rcFile}`;
 
   // Check locally if the line is already present
   if (fs.existsSync(rcPath)) {
@@ -346,7 +346,7 @@ async function updatePath(): Promise<void> {
 
   console.log(`Adding agent binary directory to ${AGENT_USER}'s PATH via ${rcFile}...`);
   const checkCmd = `grep -Fx '${line}' ${rcPath} 2>/dev/null || echo '${line}' >> ${rcPath}`;
-  await runAsPi(checkCmd);
+  await runAsAgentUser(checkCmd);
   console.log(`${rcFile} updated.`);
 }
 
@@ -362,7 +362,7 @@ async function createLauncherScript(piBinaryPath: string): Promise<void> {
     fs.mkdirSync(binDir, { recursive: true });
   }
 
-  const piHome = getPiHome();
+  const agentUserHome = getAgentUserHome();
   const platform = os.platform();
   const homeBase = platform === 'darwin' ? '/Users' : '/home';
 
@@ -376,11 +376,11 @@ echo "About to launch Pi..."
 # Check permissions of other users' home directories
 EXPOSED_DIRS=()
 HOME_BASE="${homeBase}"
-PI_HOME="${piHome}"
+AGENT_USER_HOME="${agentUserHome}"
 
 for user_home in "$HOME_BASE"/*/; do
   # Skip ${AGENT_USER}'s own home
-  if [ "$user_home" = "$PI_HOME/" ]; then
+  if [ "$user_home" = "$AGENT_USER_HOME/" ]; then
     continue
   fi
 
@@ -423,8 +423,8 @@ if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
   echo ""
 fi
 
-exec sudo -i -u ${AGENT_USER} bash -c "export npm_config_prefix=$PI_HOME/.npm-global && cd $CURRENT_DIR && ${piBinaryPath}"
 echo "Launching Pi with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
+exec sudo -i -u ${AGENT_USER} bash -c "export npm_config_prefix=$AGENT_USER_HOME/.npm-global && cd $CURRENT_DIR && ${piBinaryPath}"
 `;
   fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
   console.log('Launcher script created.');
@@ -475,8 +475,8 @@ async function createMacOsGroup(sudoReason: string, freeGroupIdFindingCount: num
 }
 
 async function setupWorkDir(): Promise<string> {
-  const piHome = getPiHome();
-  const workDir = path.join(getPiHome(), 'Work');
+  const agentUserHome = getAgentUserHome();
+  const workDir = path.join(agentUserHome, 'Work');
   const currentUser = os.userInfo().username;
   const platform = os.platform();
 
@@ -520,9 +520,9 @@ async function setupWorkDir(): Promise<string> {
   }
 
   console.log(`Setting up group permissions...`);
-  await askSudoPasswordAndRun(`chown ${AGENT_USER}:${AGENT_GROUP_NAME} ${piHome} && chmod g+rwx ${piHome}`, `required to set ${AGENT_USER}'s home to belong to ${AGENT_GROUP_NAME} group`);
+  await askSudoPasswordAndRun(`chown ${AGENT_USER}:${AGENT_GROUP_NAME} ${agentUserHome} && chmod g+rwx ${agentUserHome}`, `required to set ${AGENT_USER}'s home to belong to ${AGENT_GROUP_NAME} group`);
 
-  // Create work directory owned by pi:${AGENT_GROUP_NAME} with group rwx
+  // Create work directory owned by ${AGENT_USER}:${AGENT_GROUP_NAME} with group rwx
   console.log(`Setting up work directory at ${workDir}...`);
   await askSudoPasswordAndRun(`mkdir -p ${workDir} && chown ${AGENT_USER}:${AGENT_GROUP_NAME} ${workDir} && chmod g+rwx ${workDir}`, 'required to set up work directory');
   console.log('Work directory ready.');
@@ -535,7 +535,7 @@ const RECOMMENDED_EXTENSIONS = ['npm:awto-pi-lot'];
 async function installExtensions(piBinaryPath: string, verbose?: boolean): Promise<void> {
   for (const ext of RECOMMENDED_EXTENSIONS) {
     console.log(`Installing recommended extension: ${ext}...`);
-    await runAsPi(`${piBinaryPath} install ${ext}`, verbose);
+    await runAsAgentUser(`${piBinaryPath} install ${ext}`, verbose);
     console.log(`Extension ${ext} installed.`);
   }
 }
@@ -573,13 +573,13 @@ async function configureAuth(): Promise<void> {
     },
   };
 
-  const piHome = getPiHome();
-  const agentDir = path.join(piHome, '.pi', 'agent');
+  const agentUserHome = getAgentUserHome();
+  const agentDir = path.join(agentUserHome, '.pi', 'agent');
   const authFilePath = path.join(agentDir, 'auth.json');
   const authJson = JSON.stringify(authData, null, 2);
 
   console.log(`Writing auth.json to ${agentDir}...`);
-  await runAsPi(`mkdir -p ${agentDir} && cat > ${authFilePath} << 'SKYNOT_AUTH_EOF'
+  await runAsAgentUser(`mkdir -p ${agentDir} && cat > ${authFilePath} << 'SKYNOT_AUTH_EOF'
 ${authJson}
 SKYNOT_AUTH_EOF
 chmod 600 ${authFilePath}`);
@@ -597,24 +597,24 @@ async function copySshKeys(): Promise<void> {
     return;
   }
 
-  const piHome = getPiHome();
-  const piSshDir = path.join(piHome, '.ssh');
+  const agentUserHome = getAgentUserHome();
+  const agentUserSshDir = path.join(agentUserHome, '.ssh');
 
-  console.log(`Copying SSH keys to ${piSshDir}...`);
+  console.log(`Copying SSH keys to ${agentUserSshDir}...`);
 
 
 
   const reason = 'required to copy SSH keys';
 
   // Create .ssh dir with proper ownership and permissions
-  await runAsPi(`mkdir -p ${piSshDir} && chmod 700 ${piSshDir}`);
+  await runAsAgentUser(`mkdir -p ${agentUserSshDir} && chmod 700 ${agentUserSshDir}`);
 
-  // Copy keys as root (pi user can't read the source), then chown to pi
-  await askSudoPasswordAndRun(`cp ${privateKey} ${piSshDir}/id_rsa && chown ${AGENT_USER} ${piSshDir}/id_rsa && chmod 600 ${piSshDir}/id_rsa`, reason);
-  await askSudoPasswordAndRun(`cp ${publicKey} ${piSshDir}/id_rsa.pub && chown ${AGENT_USER} ${piSshDir}/id_rsa.pub && chmod 644 ${piSshDir}/id_rsa.pub`, reason);
+  // Copy keys as root (agent user can't read the source), then chown to agent user
+  await askSudoPasswordAndRun(`cp ${privateKey} ${agentUserSshDir}/id_rsa && chown ${AGENT_USER} ${agentUserSshDir}/id_rsa && chmod 600 ${agentUserSshDir}/id_rsa`, reason);
+  await askSudoPasswordAndRun(`cp ${publicKey} ${agentUserSshDir}/id_rsa.pub && chown ${AGENT_USER} ${agentUserSshDir}/id_rsa.pub && chmod 644 ${agentUserSshDir}/id_rsa.pub`, reason);
 
   // Add GitHub's host key to known_hosts to avoid interactive prompt
-  await runAsPi(`ssh-keyscan -t rsa github.com >> ${piSshDir}/known_hosts`);
+  await runAsAgentUser(`ssh-keyscan -t rsa github.com >> ${agentUserSshDir}/known_hosts`);
   console.log('SSH keys copied, permissions set, and GitHub added to known_hosts.');
 }
 
@@ -622,7 +622,7 @@ async function wipeInstallation(): Promise<void> {
   const installDir = getPiInstallDir();
   if (fs.existsSync(installDir)) {
     console.log(`Wiping existing installation at ${installDir}...`);
-    await runAsPi(`rm -rf ${installDir}`);
+    await runAsAgentUser(`rm -rf ${installDir}`);
     console.log('Installation wiped.');
   } else {
     console.log('No existing installation found, nothing to wipe.');
@@ -630,13 +630,13 @@ async function wipeInstallation(): Promise<void> {
 }
 
 async function destroyInstallation(): Promise<void> {
-  const piHome = getPiHome();
+  const agentUserHome = getAgentUserHome();
   const platform = os.platform();
 
   console.log('\n=== DESTROY MODE ===');
   console.log('This will permanently DELETE:');
   console.log(`  - The '${AGENT_USER}' user`);
-  console.log(`  - All data in ${piHome} (the user\'s home directory)`);
+  console.log(`  - All data in ${agentUserHome} (the user\'s home directory)`);
   console.log(`  - The '${AGENT_GROUP_NAME}' group`);
   console.log(`  - The launcher script ~/bin/${LAUNCHER_SCRIPT_FILENAME}`);
   console.log('');
@@ -665,9 +665,9 @@ async function destroyInstallation(): Promise<void> {
   }
 
   // Ensure home directory is gone (some macOS configs may leave it)
-  if (fs.existsSync(piHome)) {
-    console.log(`Cleaning residual home directory ${piHome}...`);
-    await askSudoPasswordAndRun(`rm -rf ${piHome}`, reason);
+  if (fs.existsSync(agentUserHome)) {
+    console.log(`Cleaning residual home directory ${agentUserHome}...`);
+    await askSudoPasswordAndRun(`rm -rf ${agentUserHome}`, reason);
     console.log('Residual home directory removed.');
   }
 
@@ -713,7 +713,7 @@ async function main() {
     .option('-n, --npm', `Install Pi using npm instead of tarball`)
     .option('-s, --ssh', `Copy current user's SSH keys to the '${AGENT_USER}' user for git SSH access (and add GitHub to known_hosts)`)
     .option('-p, --paranoid', `Never cache the sudo password; ask for it every time it is needed`)
-    .option('--BURN, --destroy', `Destroy the '${AGENT_USER}' user, their home directory (${getPiHome()}), and the '${AGENT_GROUP_NAME}' group. Requires typing 'DELETE' to confirm.`);
+    .option('--BURN, --destroy', `Destroy the '${AGENT_USER}' user, their home directory (${getAgentUserHome()}), and the '${AGENT_GROUP_NAME}' group. Requires typing 'DELETE' to confirm.`);
   program.parse(process.argv);
   const opts = program.opts();
 
@@ -736,7 +736,7 @@ async function main() {
     await checkWget();
   }
 
-  await ensurePiUser();
+  await ensureAgentUserExists();
 
   if (opts.update) {
     await wipeInstallation();
