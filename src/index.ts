@@ -894,6 +894,11 @@ async function installExtensions(
     }
 }
 
+async function installContextLens(piBinaryPath: string, verbose?: boolean): Promise<void> {
+    process.chdir(agentUserHome);
+    await runAsAgentUser("npm install context-lens", verbose);
+}
+
 async function launchAgent(): Promise<void> {
     const scriptPath = path.join(os.homedir(), "bin", LAUNCHER_SCRIPT_FILENAME);
     const child = spawn(scriptPath, [], { stdio: "inherit" });
@@ -1181,6 +1186,10 @@ async function main() {
             `DEPRECATED: This flag installs recommended extensions after installing Pi; rather use \`${LAUNCHER_SCRIPT_FILENAME} install <extension>\` instead.`
         )
         .option(
+            "-c, --context-lens",
+            `This flag additionaly installs context-lens after installing Pi and creates a launcher script "cpi" for it.`
+        )
+        .option(
             "-a, --auth",
             `Configure provider authentication (creates auth.json for the '${AGENT_USER}' user)`
         )
@@ -1341,6 +1350,10 @@ async function main() {
 
     if (opts.ssh) {
         await copySshKeys();
+    }
+
+    if (opts.contextLens) {
+        await installContextLens(piBinaryPath, opts.verbose);
     }
 
     if (resolvedGitIdentity instanceof Some) {
