@@ -941,10 +941,7 @@ async function installContextLens(
         console.log("context-lens already installed.");
         if (update) {
             console.log("Updating context-lens...");
-            await runAsAgentUser(
-                `git fetch && git pull origin/master`,
-                verbose
-            );
+            await runAsAgentUser(`git fetch && git pull origin main`, verbose);
             await buildContextLens(contextLensDir, verbose);
             console.log("context-lens updated.");
         }
@@ -952,7 +949,18 @@ async function installContextLens(
         console.log("Installing context-lens...");
         await runAsAgentUser(`git clone ${contextLensGithubRepoUrl}`, verbose);
         process.chdir(contextLensDir);
-        // TODO: apply patches
+
+        // Apply patches
+        const patchesDir = path.join(__dirname, "..", "context-lens-patches");
+        const patchFiles = fs
+            .readdirSync(patchesDir)
+            .filter((f) => f.endsWith(".patch"));
+
+        for (const patchFile of patchFiles) {
+            const patchPath = path.join(patchesDir, patchFile);
+            console.log(`Applying patch: ${patchFile}`);
+            await runAsAgentUser(`git apply "${patchPath}"`);
+        }
 
         await buildContextLens(contextLensDir, verbose);
         console.log("context-lens installed.");

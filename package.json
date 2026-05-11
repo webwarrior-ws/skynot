@@ -6,6 +6,10 @@
   "bin": {
     "skynot": "dist/index.js"
   },
+  "files": [
+    "dist/",
+    "context-lens-patches/"
+  ],
   "scripts": {
     "build": "npm install && npx tsc",
     "prepublishOnly": "npm run build",

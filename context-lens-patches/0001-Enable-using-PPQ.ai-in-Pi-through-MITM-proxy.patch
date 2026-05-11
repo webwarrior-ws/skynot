@@ -1,0 +1,30 @@
+From de19368bbde920b52f8e21618a4a97b83ddbe9bd Mon Sep 17 00:00:00 2001
+From: webwarrior-ws <reg@webwarrior.ws>
+Date: Mon, 11 May 2026 11:14:16 +0200
+Subject: [PATCH] Enable using PPQ.ai in Pi through MITM proxy
+
+By adding a capture pattern for PPQ.ai API, which uses
+different URL scheme (/chat/completions with no /v1 prefix),
+and catch-all path patterns don't match it.
+
+Fixes https://github.com/larsderidder/context-lens/issues/45
+---
+ mitm_addon.py | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/mitm_addon.py b/mitm_addon.py
+index 78dceab..5328909 100644
+--- a/mitm_addon.py
++++ b/mitm_addon.py
+@@ -62,6 +62,8 @@ CAPTURE_PATTERNS = [
+     ("api.anthropic.com", "/v1/messages", "anthropic", None),
+     # Gemini API
+     ("generativelanguage.googleapis.com", "/v1", "gemini", None),
++    # PPQ.ai
++    ("api.ppq.ai", "/chat/completions", "openai", None),
+ ]
+ 
+ # Catch-all path patterns: match any host with these path substrings.
+-- 
+2.54.0
+
