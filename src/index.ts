@@ -1224,17 +1224,17 @@ async function destroyInstallation(): Promise<void> {
         );
     }
 
-    // Remove the launcher script
-    const launcherPath = path.join(
-        os.homedir(),
-        "bin",
-        LAUNCHER_SCRIPT_FILENAME
+    // Remove the launcher scripts
+    [LAUNCHER_SCRIPT_FILENAME, CONTEXT_LENS_SCRIPT_FILENAME].forEach(
+        (scriptFileName) => {
+            const launcherPath = path.join(os.homedir(), "bin", scriptFileName);
+            if (fs.existsSync(launcherPath)) {
+                console.log(`Removing launcher script at ${launcherPath}...`);
+                fs.unlinkSync(launcherPath);
+                console.log("Launcher script removed.");
+            }
+        }
     );
-    if (fs.existsSync(launcherPath)) {
-        console.log(`Removing launcher script at ${launcherPath}...`);
-        fs.unlinkSync(launcherPath);
-        console.log("Launcher script removed.");
-    }
 
     console.log("\n=== DESTROY COMPLETE ===");
     console.log("All related resources have been removed.");
