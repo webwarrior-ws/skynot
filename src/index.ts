@@ -920,11 +920,15 @@ async function buildContextLens(
     verbose?: boolean
 ): Promise<void> {
     console.log("Building context-lens...");
-    process.chdir(contextLensDir);
-    await runAsAgentUser(
-        "npm install && npm build && cd ui && npm build",
-        verbose
-    );
+    const commandOptions: RunProcessOptions = { cwd: contextLensDir };
+    if (verbose) {
+        commandOptions.verboseStdErr = true;
+        commandOptions.verboseStdOut = true;
+    }
+    await runCommand("npm", ["install"], commandOptions);
+    await runCommand("npm", ["run", "build"], commandOptions);
+    commandOptions.cwd = path.join(contextLensDir, "ui");
+    await runCommand("npm", ["run", "build"], commandOptions);
     console.log("context-lens built.");
 }
 
@@ -934,21 +938,31 @@ async function installContextLens(
 ): Promise<void> {
     process.chdir(agentUserHome);
     const contextLensRepoName = "context-lens";
-    const contextLensGithubRepoUrl = `git@github.com:larsderidder/${contextLensRepoName}.git`;
+    const contextLensGithubRepoUrl = `https://github.com/larsderidder/${contextLensRepoName}.git`;
     const contextLensDir = path.join(agentUserHome, contextLensRepoName);
+    const commandOptions: RunProcessOptions = {};
+    if (verbose) {
+        commandOptions.verboseStdErr = true;
+        commandOptions.verboseStdOut = true;
+    }
 
     if (fs.existsSync(contextLensDir)) {
         console.log("context-lens already installed.");
         if (update) {
             console.log("Updating context-lens...");
-            await runAsAgentUser(`git fetch && git pull origin main`, verbose);
+            await runCommand("git", ["fetch"], commandOptions);
+            await runCommand("git", ["pull", "origin", "main"], commandOptions);
             await buildContextLens(contextLensDir, verbose);
             console.log("context-lens updated.");
         }
     } else {
         console.log("Installing context-lens...");
-        await runAsAgentUser(`git clone ${contextLensGithubRepoUrl}`, verbose);
-        process.chdir(contextLensDir);
+        await runCommand(
+            "git",
+            ["clone", contextLensGithubRepoUrl],
+            commandOptions
+        );
+        commandOptions.cwd = contextLensDir;
 
         // Apply patches
         const patchesDir = path.join(__dirname, "..", "context-lens-patches");
@@ -959,7 +973,7 @@ async function installContextLens(
         for (const patchFile of patchFiles) {
             const patchPath = path.join(patchesDir, patchFile);
             console.log(`Applying patch: ${patchFile}`);
-            await runAsAgentUser(`git apply "${patchPath}"`);
+            await runCommand("git", ["apply", patchPath], commandOptions);
         }
 
         await buildContextLens(contextLensDir, verbose);
