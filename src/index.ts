@@ -920,15 +920,16 @@ async function buildContextLens(
     verbose?: boolean
 ): Promise<void> {
     console.log("Building context-lens...");
-    const commandOptions: RunProcessOptions = { cwd: contextLensDir };
+    const commandOptions: RunProcessOptions = {};
     if (verbose) {
         commandOptions.verboseStdErr = true;
         commandOptions.verboseStdOut = true;
     }
-    await runCommand("npm", ["install"], commandOptions);
-    await runCommand("npm", ["run", "build"], commandOptions);
-    commandOptions.cwd = path.join(contextLensDir, "ui");
-    await runCommand("npm", ["run", "build"], commandOptions);
+    [contextLensDir, path.join(contextLensDir, "ui")].forEach(async (dir) => {
+        commandOptions.cwd = dir;
+        await runCommand("npm", ["install"], commandOptions);
+        await runCommand("npm", ["run", "build"], commandOptions);
+    });
     console.log("context-lens built.");
 }
 
