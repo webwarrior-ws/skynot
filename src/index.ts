@@ -925,11 +925,11 @@ async function buildContextLens(
         commandOptions.verboseStdErr = true;
         commandOptions.verboseStdOut = true;
     }
-    [contextLensDir, path.join(contextLensDir, "ui")].forEach(async (dir) => {
+    for (const dir of [contextLensDir, path.join(contextLensDir, "ui")]) {
         commandOptions.cwd = dir;
         await runCommand("npm", ["install"], commandOptions);
         await runCommand("npm", ["run", "build"], commandOptions);
-    });
+    }
     console.log("context-lens built.");
 }
 
@@ -989,6 +989,11 @@ async function installContextLens(
                 verbose
             );
         } else {
+            // Better way to install pip?
+            await askSudoPasswordAndRun(
+                "apt install --yes python3-pip",
+                "Install pip"
+            );
             await runAsAgentUser(
                 "python3 -m pip install --user pipx && python3 -m pipx ensurepath",
                 verbose
