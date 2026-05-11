@@ -28,6 +28,7 @@ const AGENT_PACKAGE = "@mariozechner/pi-coding-agent";
 const AGENT_GITHUB_REPO = "badlogic/pi-mono";
 const AGENT_USER = "aidev";
 const LAUNCHER_SCRIPT_FILENAME = "spi";
+const CONTEXT_LENS_SCRIPT_FILENAME = "cpi";
 const AGENT_GROUP_NAME = "aiteam";
 const DEFAULT_UMASK = "007";
 const MIN_NODE_MAJOR_VERSION = 22;
@@ -578,10 +579,13 @@ set_dir_umask
     console.log(`${rcFile} updated with umask script.`);
 }
 
-async function createLauncherScript(piBinaryPath: string): Promise<void> {
+async function createLauncherScript(
+    command: string,
+    scriptFileName: string
+): Promise<void> {
     const currentUserHome = os.homedir();
     const binDir = path.join(currentUserHome, "bin");
-    const scriptPath = path.join(binDir, LAUNCHER_SCRIPT_FILENAME);
+    const scriptPath = path.join(binDir, scriptFileName);
 
     console.log(`Creating launcher script at ${scriptPath}...`);
 
@@ -661,9 +665,7 @@ if [ \${#EXPOSED_DIRS[@]} -gt 0 ]; then
   echo ""
 fi
 
-FULL_SUDO_CMD="export npm_config_prefix=$AGENT_USER_HOME/.npm-global && umask ${DEFAULT_UMASK} && cd $CURRENT_DIR && ${piBinaryPath} $@"
-echo "Launching Pi with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
-exec sudo -i -u ${AGENT_USER} bash -c "$FULL_SUDO_CMD"
+${command}
 `;
     fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
     console.log("Launcher script created.");
@@ -685,6 +687,25 @@ exec sudo -i -u ${AGENT_USER} bash -c "$FULL_SUDO_CMD"
     } else {
         console.log(`$HOME/bin already in PATH (${rcFile}).`);
     }
+}
+
+async function createPiLauncherScript(piBinaryPath: string): Promise<void> {
+    const command = `
+FULL_SUDO_CMD="export npm_config_prefix=$AGENT_USER_HOME/.npm-global && umask ${DEFAULT_UMASK} && cd $CURRENT_DIR && ${piBinaryPath} $@"
+echo "Launching Pi with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
+exec sudo -i -u ${AGENT_USER} bash -c "$FULL_SUDO_CMD"`;
+    await createLauncherScript(command, LAUNCHER_SCRIPT_FILENAME);
+}
+
+async function createContextLensLauncherScript(
+    contextLensDir: string
+): Promise<void> {
+    const cmd = `node ${contextLensDir}/dist/cli.js pi --mitm --`;
+    const command = `
+FULL_SUDO_CMD="export npm_config_prefix=$AGENT_USER_HOME/.npm-global && umask ${DEFAULT_UMASK} && cd $CURRENT_DIR && ${cmd} $@"
+echo "Launching Pi using context-lens warapper with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
+exec sudo -i -u ${AGENT_USER} bash -c "$FULL_SUDO_CMD"`;
+    await createLauncherScript(command, CONTEXT_LENS_SCRIPT_FILENAME);
 }
 
 async function createMacOsGroup(
@@ -894,8 +915,21 @@ async function installExtensions(
     }
 }
 
+async function buildContextLens(
+    contextLensDir: string,
+    verbose?: boolean
+): Promise<void> {
+    console.log("Building context-lens...");
+    process.chdir(contextLensDir);
+    await runAsAgentUser(
+        "npm install && npm build && cd ui && npm build",
+        verbose
+    );
+    console.log("context-lens built.");
+}
+
 async function installContextLens(
-    piBinaryPath: string,
+    update: boolean,
     verbose?: boolean
 ): Promise<void> {
     process.chdir(agentUserHome);
@@ -905,13 +939,22 @@ async function installContextLens(
 
     if (fs.existsSync(contextLensDir)) {
         console.log("context-lens already installed.");
-        // TODO: update when -u flag is present?
+        if (update) {
+            console.log("Updating context-lens...");
+            await runAsAgentUser(
+                `git fetch && git pull origin/master`,
+                verbose
+            );
+            await buildContextLens(contextLensDir, verbose);
+            console.log("context-lens updated.");
+        }
     } else {
         console.log("Installing context-lens...");
         await runAsAgentUser(`git clone ${contextLensGithubRepoUrl}`, verbose);
         process.chdir(contextLensDir);
         // TODO: apply patches
 
+        await buildContextLens(contextLensDir, verbose);
         console.log("context-lens installed.");
     }
 
@@ -932,7 +975,7 @@ async function installContextLens(
         console.log("Installed mitmproxy.");
     }
 
-    // TODO: create launch script
+    await createContextLensLauncherScript(contextLensDir);
 }
 
 async function launchAgent(): Promise<void> {
@@ -1389,7 +1432,7 @@ async function main() {
     }
 
     if (opts.contextLens) {
-        await installContextLens(piBinaryPath, opts.verbose);
+        await installContextLens(opts.update, opts.verbose);
     }
 
     if (resolvedGitIdentity instanceof Some) {
@@ -1399,7 +1442,7 @@ async function main() {
     await updatePath();
     await updateAgentUserUmask();
     await setupUmaskScriptForCurrentUser();
-    await createLauncherScript(piBinaryPath);
+    await createPiLauncherScript(piBinaryPath);
 
     const workDir = await setupWorkDir();
     console.log(
