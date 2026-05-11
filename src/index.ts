@@ -894,9 +894,45 @@ async function installExtensions(
     }
 }
 
-async function installContextLens(piBinaryPath: string, verbose?: boolean): Promise<void> {
+async function installContextLens(
+    piBinaryPath: string,
+    verbose?: boolean
+): Promise<void> {
     process.chdir(agentUserHome);
-    await runAsAgentUser("npm install context-lens", verbose);
+    const contextLensRepoName = "context-lens";
+    const contextLensGithubRepoUrl = `git@github.com:larsderidder/${contextLensRepoName}.git`;
+    const contextLensDir = path.join(agentUserHome, contextLensRepoName);
+
+    if (fs.existsSync(contextLensDir)) {
+        console.log("context-lens already installed.");
+        // TODO: update when -u flag is present?
+    } else {
+        console.log("Installing context-lens...");
+        await runAsAgentUser(`git clone ${contextLensGithubRepoUrl}`, verbose);
+        process.chdir(contextLensDir);
+        // TODO: apply patches
+
+        console.log("context-lens installed.");
+    }
+
+    if (!fs.existsSync(path.join(agentUserHome, ".local/bin/mitmproxy"))) {
+        console.log("Installing mitmproxy (needed for context-lens)...");
+        if (os.platform() == "darwin") {
+            await runAsAgentUser(
+                "brew install pipx && pipx ensurepath",
+                verbose
+            );
+        } else {
+            await runAsAgentUser(
+                "python3 -m pip install --user pipx && python3 -m pipx ensurepath",
+                verbose
+            );
+        }
+        await runAsAgentUser("pipx install mitmproxy", verbose);
+        console.log("Installed mitmproxy.");
+    }
+
+    // TODO: create launch script
 }
 
 async function launchAgent(): Promise<void> {
