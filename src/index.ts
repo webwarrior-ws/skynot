@@ -1520,6 +1520,11 @@ async function main() {
     console.log(`3. Clone the git repository where you will work on`);
     console.log(`4. \`cd\` into the cloned repository`);
     console.log(`5. Launch via \`${LAUNCHER_SCRIPT_FILENAME}\`\n`);
+    if (opts.contextLens) {
+        console.log(
+            `5. Launch with context-lens via \`${CONTEXT_LENS_SCRIPT_FILENAME}\`\n`
+        );
+    }
 }
 
 main().catch((err) => {
