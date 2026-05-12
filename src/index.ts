@@ -963,7 +963,10 @@ async function installContextLens(
             ["clone", contextLensGithubRepoUrl],
             commandOptions
         );
-        commandOptions.cwd = contextLensDir;
+        const commandOptionsForContextLensDir = {
+            ...commandOptions,
+            cwd: contextLensDir,
+        };
 
         // Apply patches
         const patchesDir = path.join(__dirname, "..", "context-lens-patches");
@@ -974,32 +977,60 @@ async function installContextLens(
         for (const patchFile of patchFiles) {
             const patchPath = path.join(patchesDir, patchFile);
             console.log(`Applying patch: ${patchFile}`);
-            await runCommand("git", ["apply", patchPath], commandOptions);
+            await runCommand(
+                "git",
+                ["apply", patchPath],
+                commandOptionsForContextLensDir
+            );
         }
 
         await buildContextLens(contextLensDir, verbose);
         console.log("context-lens installed.");
     }
 
-    if (!fs.existsSync(path.join(agentUserHome, ".local/bin/mitmproxy"))) {
+    const mitmProxyBinariesDir = path.join(agentUserHome, ".local/bin/");
+    if (!fs.existsSync(path.join(mitmProxyBinariesDir, "mitmproxy"))) {
         console.log("Installing mitmproxy (needed for context-lens)...");
         if (os.platform() == "darwin") {
             await runAsAgentUser(
-                "brew install pipx && pipx ensurepath",
+                "brew install pipx && pipx ensurepath && pipx install mitmproxy",
                 verbose
             );
         } else {
-            // Better way to install pip?
-            await askSudoPasswordAndRun(
-                "apt install --yes python3-pip",
-                "Install pip"
+            const mitmProxyTarballName = "mitmproxy-12.2.2-linux-x86_64.tar.gz";
+            const mitmProxyTarballDwonloadUrl = `https://downloads.mitmproxy.org/12.2.2/${mitmProxyTarballName}`;
+
+            const wgetCommandOptions = {
+                ...commandOptions,
+                cwd: agentUserHome,
+            };
+            const wgetCommandArgs = [mitmProxyTarballDwonloadUrl];
+            if (!verbose) {
+                wgetCommandArgs.push("--quiet");
+            }
+            await runCommand("wget", wgetCommandArgs, wgetCommandOptions);
+
+            await runCommand(
+                "mkdir",
+                ["--parents", mitmProxyBinariesDir],
+                commandOptions
             );
-            await runAsAgentUser(
-                "python3 -m pip install --user pipx && python3 -m pipx ensurepath",
-                verbose
-            );
+            const tarCommandArgs = [
+                "--extract",
+                "--gzip",
+                "--file",
+                path.join(agentUserHome, mitmProxyTarballName),
+            ];
+            if (verbose) {
+                tarCommandArgs.push("--verbose");
+            }
+            const tarCommandOptions = {
+                ...commandOptions,
+                cwd: mitmProxyBinariesDir,
+            };
+            await runCommand("tar", tarCommandArgs, tarCommandOptions);
+            await runCommand("rm", [mitmProxyTarballName], commandOptions);
         }
-        await runAsAgentUser("pipx install mitmproxy", verbose);
         console.log("Installed mitmproxy.");
     }
 
@@ -1415,6 +1446,10 @@ async function main() {
 
     // wget is needed to download tarball
     if (!opts.npm) {
+        await checkWget();
+    }
+    // context-lens is downloaded using wget on Linux
+    if (opts.contextLens && os.platform() == "linux") {
         await checkWget();
     }
 
