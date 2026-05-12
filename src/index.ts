@@ -416,13 +416,11 @@ async function checkNodeVersion(
     }
 }
 
-async function checkWget(): Promise<void> {
+async function checkWget(errorMessage: string): Promise<void> {
     try {
         await execAsync("which wget");
     } catch (err) {
-        console.error(
-            "Error: wget not found. Either install wget or use --npm flag."
-        );
+        console.error(errorMessage);
         process.exit(1);
     }
 }
@@ -1447,11 +1445,15 @@ async function main() {
 
     // wget is needed to download tarball
     if (!opts.npm) {
-        await checkWget();
+        await checkWget(
+            "Error: wget not found. Either install wget or use --npm flag."
+        );
     }
     // context-lens is downloaded using wget on Linux
     if (opts.contextLens && os.platform() == "linux") {
-        await checkWget();
+        await checkWget(
+            "Error: wget not found. It is needed for installing mitmproxy on Linux which is needed for context-lens."
+        );
     }
 
     await ensureAgentGroupExists();
