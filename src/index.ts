@@ -704,6 +704,7 @@ async function createContextLensLauncherScript(
     const command = `
 FULL_SUDO_CMD="export npm_config_prefix=$AGENT_USER_HOME/.npm-global && umask ${DEFAULT_UMASK} && cd $CURRENT_DIR && ${cmd} $@"
 echo "Launching Pi using context-lens warapper with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
+echo "The context-lens UI is available at http://localhost:4041/"
 exec sudo -i -u ${AGENT_USER} bash -c "$FULL_SUDO_CMD"`;
     await createLauncherScript(command, CONTEXT_LENS_SCRIPT_FILENAME);
 }
