@@ -755,7 +755,7 @@ async function createContextLensLauncherScript(
     contextLensDir: string,
     apiKeyExport: Option<{ name: string; value: string }> = Nothing
 ): Promise<void> {
-    const cmd = `HOME=${agentUserHome} UPSTREAM_OPENAI_URL=https://api.ppq.ai node ${contextLensDir}/dist/cli.js pi`;
+    const cmd = `HOME=${agentUserHome} node ${contextLensDir}/dist/cli.js pi`;
     const command = `
 FULL_SUDO_CMD="export npm_config_prefix=$AGENT_USER_HOME/.npm-global && umask ${DEFAULT_UMASK} && cd $CURRENT_DIR && ${cmd} $@"
 echo "Launching Pi using context-lens warapper with ${AGENT_USER} user (sudo is required to impersonate '${AGENT_USER}' user)..."
